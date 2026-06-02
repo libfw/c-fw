@@ -44,6 +44,10 @@ HCL native syntax (attributes, labeled blocks, scalar/list values). It is **not
 HCL2-compatible**: no expressions, interpolation, functions, or heredocs. That is
 intentional — policies are configuration, not programs.
 
+The JSON ruleset grammar (the built-in parser in `json.c`) and its deliberate
+deviations from strict RFC 8259 are documented in [GRAMMAR.md](GRAMMAR.md); the
+HCL grammar is owned by c-hcl.
+
 ## Rule schema
 
 JSON (the daemon-facing form) and the equivalent HCL:
