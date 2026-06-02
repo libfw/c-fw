@@ -1,0 +1,7 @@
+#!/bin/sh
+# Run go-task; fall back to pkgx (which also provides clang/llvm + make on demand).
+set -eu
+if command -v task >/dev/null 2>&1; then exec task "$@"; fi
+if command -v pkgx >/dev/null 2>&1; then exec pkgx +taskfile.dev +llvm.org +gnu.org/make -- task "$@"; fi
+echo "taskw: install go-task (https://taskfile.dev) or pkgx (https://pkgx.sh)." >&2
+exit 127

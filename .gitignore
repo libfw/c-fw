@@ -1,0 +1,8 @@
+*.o
+*.a
+/test/acl_test
+/test/conntrack_test
+/test/acl_hcl_test
+*.profraw
+*.profdata
+*.dSYM/

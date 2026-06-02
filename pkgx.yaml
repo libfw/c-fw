@@ -1,0 +1,5 @@
+# pkgx dev-environment manifest (https://docs.pkgx.sh).
+dependencies:
+  taskfile.dev: '*'
+  llvm.org: '*'
+  gnu.org/make: '*'

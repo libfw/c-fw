@@ -1,0 +1,9 @@
+# Taskfile for c-fw (https://taskfile.dev). No toolchain? `dev` (pkgx) or ./taskw <task>.
+version: "3"
+tasks:
+  default: { cmds: [task --list], silent: true }
+  build:   { desc: Build libcfw.a, cmds: [make all] }
+  test:    { desc: Run the unit tests, cmds: [make test] }
+  cover:   { desc: Coverage report (llvm-cov), cmds: [make cover] }
+  fmt:     { desc: clang-format sources, cmds: [make fmt] }
+  clean:   { desc: Remove build/test artifacts, cmds: [make clean] }
