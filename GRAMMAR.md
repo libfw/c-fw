@@ -4,7 +4,7 @@ c-fw loads ACL rulesets from two interchangeable front-ends:
 
 - **HCL** — the declarative HCL subset, parsed by the vendored
   [libhcl/c-hcl](https://github.com/libhcl/c-hcl) (see its
-  [GRAMMAR.md](https://github.com/libhcl/c-hcl/blob/master/GRAMMAR.md)); the
+  [GRAMMAR.md](https://github.com/libhcl/c-hcl/blob/main/GRAMMAR.md)); the
   HCL-to-ACL mapping lives in `acl_hcl.c`.
 - **JSON** — a small built-in JSON parser (`json.c`) used by `acl.c` to load
   rulesets that were emitted by tooling.
