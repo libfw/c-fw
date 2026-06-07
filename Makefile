@@ -25,8 +25,10 @@ acl_hcl.o: acl_hcl.c acl_hcl.h acl.h $(HCL_DIR)/hcl.h
 	$(CC) $(CFLAGS) -I$(HCL_DIR) -c acl_hcl.c -o $@
 hcl.o: $(HCL_DIR)/hcl.c $(HCL_DIR)/hcl.h
 	$(CC) $(CFLAGS) -I$(HCL_DIR) -c $(HCL_DIR)/hcl.c -o $@
+ast.o: $(HCL_DIR)/ast.c $(HCL_DIR)/hcl.h
+	$(CC) $(CFLAGS) -I$(HCL_DIR) -c $(HCL_DIR)/ast.c -o $@
 
-libcfw.a: acl.o json.o conntrack.o acl_hcl.o hcl.o
+libcfw.a: acl.o json.o conntrack.o acl_hcl.o hcl.o ast.o
 	$(AR) rcs $@ $^
 
 .PHONY: fmt
@@ -37,7 +39,7 @@ fmt:
 test:
 	$(CC) $(TEST_CFLAGS) acl.c json.c test/acl_test.c -o test/acl_test && ./test/acl_test
 	$(CC) $(TEST_CFLAGS) conntrack.c test/conntrack_test.c -o test/conntrack_test && ./test/conntrack_test
-	$(CC) $(TEST_CFLAGS) acl.c json.c acl_hcl.c $(HCL_DIR)/hcl.c test/acl_hcl_test.c -o test/acl_hcl_test && ./test/acl_hcl_test
+	$(CC) $(TEST_CFLAGS) acl.c json.c acl_hcl.c $(HCL_DIR)/hcl.c $(HCL_DIR)/ast.c test/acl_hcl_test.c -o test/acl_hcl_test && ./test/acl_hcl_test
 
 .PHONY: cover
 cover:
@@ -46,7 +48,7 @@ cover:
 	LLVM_PROFILE_FILE=acl.profraw ./test/acl_test >/dev/null
 	$(CC) $(COVER_CFLAGS) conntrack.c test/conntrack_test.c -o test/conntrack_test
 	LLVM_PROFILE_FILE=conntrack.profraw ./test/conntrack_test >/dev/null
-	$(CC) $(COVER_CFLAGS) acl.c json.c acl_hcl.c $(HCL_DIR)/hcl.c test/acl_hcl_test.c -o test/acl_hcl_test
+	$(CC) $(COVER_CFLAGS) acl.c json.c acl_hcl.c $(HCL_DIR)/hcl.c $(HCL_DIR)/ast.c test/acl_hcl_test.c -o test/acl_hcl_test
 	LLVM_PROFILE_FILE=aclhcl.profraw ./test/acl_hcl_test >/dev/null
 	$(LLVM_PROFDATA) merge -sparse acl.profraw -o acl.profdata
 	$(LLVM_COV) report ./test/acl_test -instr-profile=acl.profdata acl.c json.c
