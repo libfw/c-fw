@@ -51,6 +51,10 @@ struct acl {
   enum acl_action default_action;
   struct rule *rules;
   size_t n;
+  /* Observability counters. Held behind pointers so acl_check() can update them
+   * through a `const struct acl *` (the pointees are non-const). */
+  uint64_t *hits;          /* n entries: per-rule cumulative match count */
+  struct acl_stats *stats; /* aggregate verdict/byte counters */
 };
 
 static bool parse_mac(const char *s, uint8_t out[6]) {
@@ -272,6 +276,15 @@ struct acl *acl_parse(const char *json, size_t len) {
     }
   }
 
+  acl->stats = calloc(1, sizeof(*acl->stats));
+  if (acl->stats == NULL)
+    goto err;
+  if (acl->n > 0) {
+    acl->hits = calloc(acl->n, sizeof(*acl->hits));
+    if (acl->hits == NULL)
+      goto err;
+  }
+
   jfree(root);
   INFOF("acl: loaded %zu rule(s) (default: %s)", acl->n,
         acl->default_action == ACL_ALLOW ? "allow" : "deny");
@@ -323,6 +336,8 @@ void acl_destroy(struct acl *acl) {
   if (acl == NULL)
     return;
   free(acl->rules);
+  free(acl->hits);
+  free(acl->stats);
   free(acl);
 }
 
@@ -384,14 +399,35 @@ static bool classify(const uint8_t *frame, size_t len, struct l3l4 *o) {
   return false; /* ARP, etc. */
 }
 
-bool acl_allows(const struct acl *acl, enum acl_dir dir, const uint8_t *frame, size_t len) {
+/* Record an allow/deny verdict of `len` bytes in direction `dir`. */
+static void acl_count(const struct acl *acl, enum acl_dir dir, bool allow, size_t len) {
+  if (acl->stats == NULL)
+    return;
+  int d = (int)dir;
+  if (allow) {
+    acl->stats->allow[d]++;
+    acl->stats->bytes_allow[d] += len;
+  } else {
+    acl->stats->deny[d]++;
+    acl->stats->bytes_deny[d] += len;
+  }
+}
+
+bool acl_check(const struct acl *acl, enum acl_dir dir, const uint8_t *frame, size_t len,
+               int *matched) {
+  if (matched != NULL)
+    *matched = -1;
   if (acl == NULL)
     return true;
 
   /* Non-IP / runt / truncated frames are allowed so basic networking works. */
   struct l3l4 p;
-  if (!classify(frame, len, &p))
+  if (!classify(frame, len, &p)) {
+    if (acl->stats != NULL)
+      acl->stats->nonip[(int)dir]++;
+    acl_count(acl, dir, true, len);
     return true;
+  }
 
   enum rule_dir want = dir == ACL_EGRESS ? RDIR_EGRESS : RDIR_INGRESS;
   for (size_t i = 0; i < acl->n; i++) {
@@ -412,7 +448,45 @@ bool acl_allows(const struct acl *acl, enum acl_dir dir, const uint8_t *frame, s
       continue;
     if (r->has_dport && (p.dport < 0 || !port_in(p.dport, r->dport_min, r->dport_max)))
       continue;
-    return r->action == ACL_ALLOW;
+    bool allow = r->action == ACL_ALLOW;
+    if (acl->hits != NULL)
+      acl->hits[i]++;
+    if (matched != NULL)
+      *matched = (int)i;
+    acl_count(acl, dir, allow, len);
+    return allow;
   }
-  return acl->default_action == ACL_ALLOW;
+  bool allow = acl->default_action == ACL_ALLOW;
+  acl_count(acl, dir, allow, len);
+  return allow;
+}
+
+bool acl_allows(const struct acl *acl, enum acl_dir dir, const uint8_t *frame, size_t len) {
+  return acl_check(acl, dir, frame, len, NULL);
+}
+
+size_t acl_rule_count(const struct acl *acl) { return acl != NULL ? acl->n : 0; }
+
+uint64_t acl_rule_hits(const struct acl *acl, size_t idx) {
+  if (acl == NULL || acl->hits == NULL || idx >= acl->n)
+    return 0;
+  return acl->hits[idx];
+}
+
+void acl_get_stats(const struct acl *acl, struct acl_stats *out) {
+  if (out == NULL)
+    return;
+  if (acl != NULL && acl->stats != NULL)
+    *out = *acl->stats;
+  else
+    memset(out, 0, sizeof(*out));
+}
+
+void acl_reset_stats(struct acl *acl) {
+  if (acl == NULL)
+    return;
+  if (acl->stats != NULL)
+    memset(acl->stats, 0, sizeof(*acl->stats));
+  if (acl->hits != NULL)
+    memset(acl->hits, 0, acl->n * sizeof(*acl->hits));
 }

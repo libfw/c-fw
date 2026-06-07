@@ -34,6 +34,36 @@ struct acl *acl_parse(const char *json, size_t len);
 // this first version; see ACL.md.
 bool acl_allows(const struct acl *acl, enum acl_dir dir, const uint8_t *frame, size_t len);
 
+// Like acl_allows, but also reports which rule decided the verdict: *matched is
+// set to the 0-based rule index, or -1 if no rule matched and the list's
+// default action applied (also -1 for a NULL acl or a non-IP passthrough).
+// acl_check additionally maintains the observability counters below.
+bool acl_check(const struct acl *acl, enum acl_dir dir, const uint8_t *frame, size_t len,
+               int *matched);
+
+// Cumulative match/verdict counters, indexed by direction ([ACL_EGRESS],
+// [ACL_INGRESS]). `nonip` counts non-IPv4 frames passed through unconditionally
+// (they are also included in the `allow`/`bytes_allow` totals).
+struct acl_stats {
+  uint64_t allow[2];
+  uint64_t deny[2];
+  uint64_t bytes_allow[2];
+  uint64_t bytes_deny[2];
+  uint64_t nonip[2];
+};
+
+// Number of rules in the list.
+size_t acl_rule_count(const struct acl *acl);
+
+// Per-rule cumulative match count (0 if idx is out of range).
+uint64_t acl_rule_hits(const struct acl *acl, size_t idx);
+
+// Copy the aggregate counters into *out (zeroed if acl is NULL).
+void acl_get_stats(const struct acl *acl, struct acl_stats *out);
+
+// Zero all counters (aggregate + per-rule).
+void acl_reset_stats(struct acl *acl);
+
 // Named acl_destroy (not acl_free) to avoid clashing with the POSIX
 // acl_free(void *) declared in <sys/acl.h>.
 void acl_destroy(struct acl *acl);

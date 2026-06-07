@@ -86,6 +86,34 @@ int main(void) {
     conntrack_free(ct);
   }
 
+  /* observability: conntrack_get_stats */
+  {
+    struct conntrack *ct = conntrack_new(16, 30, 10);
+    struct conntrack_stats s;
+    conntrack_get_stats(ct, 0, &s);
+    check("ct stats capacity 16", s.capacity == 16, true);
+    check("ct stats empty live 0", s.live == 0, true);
+    n = v4(f, 6, IP(192, 168, 1, 2), IP(8, 8, 8, 8), 40000, 443);
+    conntrack_record(ct, f, n, 100);
+    conntrack_record(ct, f, n, 100); /* refresh: not a new insert */
+    n = v4(f, 6, IP(192, 168, 1, 3), IP(8, 8, 8, 8), 40001, 443);
+    conntrack_record(ct, f, n, 100); /* second distinct flow */
+    conntrack_get_stats(ct, 100, &s);
+    check("ct inserts == 2", s.inserts == 2, true);
+    check("ct live == 2 at t=100", s.live == 2, true);
+    n = v4(f, 6, IP(8, 8, 8, 8), IP(192, 168, 1, 2), 443, 40000);
+    (void)conntrack_established(ct, f, n, 101);
+    conntrack_get_stats(ct, 101, &s);
+    check("ct lookups >= 1", s.lookups >= 1, true);
+    check("ct hits >= 1", s.hits >= 1, true);
+    conntrack_get_stats(ct, 1000, &s);
+    check("ct live == 0 after expiry", s.live == 0, true);
+    conntrack_free(ct);
+    struct conntrack_stats z;
+    conntrack_get_stats(NULL, 0, &z);
+    check("ct stats(NULL) zeroed", z.capacity == 0 && z.live == 0, true);
+  }
+
   /* Expiry (TCP timeout 30s). */
   {
     struct conntrack *ct = conntrack_new(16, 30, 10);

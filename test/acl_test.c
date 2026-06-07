@@ -280,6 +280,44 @@ int main(void) {
     acl_destroy(acl);
   }
 
+  /* observability: acl_check rule index + counters/accessors */
+  {
+    struct acl *acl = load_json("{\"default_action\":\"deny\",\"rules\":["
+                                "{\"action\":\"allow\",\"proto\":\"tcp\",\"dst_port\":80}]}");
+    n = TCP(f, MAC_A, MAC_B, IP(1, 1, 1, 1), IP(2, 2, 2, 2), 1, 80);
+    int m = -2;
+    check("acl_check allows rule0", acl_check(acl, ACL_EGRESS, f, n, &m), true);
+    check("acl_check matched idx 0", m == 0, true);
+    check("rule0 hits == 1", acl_rule_hits(acl, 0) == 1, true);
+    check("rule_count == 1", acl_rule_count(acl) == 1, true);
+    size_t n2 = TCP(f, MAC_A, MAC_B, IP(1, 1, 1, 1), IP(2, 2, 2, 2), 1, 81);
+    m = -2;
+    check("acl_check default deny", acl_check(acl, ACL_EGRESS, f, n2, &m), false);
+    check("acl_check matched -1", m == -1, true);
+    struct acl_stats st;
+    acl_get_stats(acl, &st);
+    check("stats allow egress 1", st.allow[ACL_EGRESS] == 1, true);
+    check("stats deny egress 1", st.deny[ACL_EGRESS] == 1, true);
+    check("stats bytes_allow == frame", st.bytes_allow[ACL_EGRESS] == (uint64_t)n, true);
+    uint8_t arp[60];
+    memset(arp, 0, sizeof arp);
+    arp[12] = 0x08;
+    arp[13] = 0x06; /* ARP ethertype -> non-IP passthrough */
+    check("acl_check nonip allowed", acl_allows(acl, ACL_INGRESS, arp, sizeof arp), true);
+    acl_get_stats(acl, &st);
+    check("stats nonip ingress 1", st.nonip[ACL_INGRESS] == 1, true);
+    acl_reset_stats(acl);
+    acl_get_stats(acl, &st);
+    check("reset zeroes aggregate", st.allow[ACL_EGRESS] == 0 && st.deny[ACL_EGRESS] == 0, true);
+    check("reset zeroes per-rule hits", acl_rule_hits(acl, 0) == 0, true);
+    check("rule_count(NULL) == 0", acl_rule_count(NULL) == 0, true);
+    check("rule_hits out-of-range 0", acl_rule_hits(acl, 9) == 0, true);
+    acl_destroy(acl);
+    struct acl_stats z;
+    acl_get_stats(NULL, &z);
+    check("stats(NULL) zeroed", z.allow[0] == 0 && z.nonip[1] == 0, true);
+  }
+
   /* String-escape error edges. */
   check("backslash at end", load_json("{\"c\":\"x\\") == NULL, true);
   check("truncated \\u", load_json("{\"c\":\"\\u1") == NULL, true);

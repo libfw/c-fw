@@ -42,6 +42,10 @@ struct conntrack {
   size_t cap;
   uint32_t tcp_timeout;
   uint32_t udp_timeout;
+  /* observability counters */
+  uint64_t lookups; /* conntrack_established calls with a parseable flow key */
+  uint64_t hits;    /* established lookups that matched a live flow */
+  uint64_t inserts; /* new flows recorded (not refreshes) */
 };
 
 struct conntrack *conntrack_new(size_t capacity, uint32_t tcp_timeout, uint32_t udp_timeout) {
@@ -156,6 +160,7 @@ bool conntrack_established(struct conntrack *ct, const uint8_t *frame, size_t le
   if (!flow_key(frame, len, &family, &proto, &a, &b))
     return false;
   normalize(&a, &b, &lo, &hi);
+  ct->lookups++;
   for (size_t i = 0; i < ct->cap; i++) {
     struct flow *f = &ct->flows[i];
     if (flow_match(f, family, proto, &lo, &hi)) {
@@ -164,6 +169,7 @@ bool conntrack_established(struct conntrack *ct, const uint8_t *frame, size_t le
         return false;
       }
       f->last_seen = now;
+      ct->hits++;
       return true;
     }
   }
@@ -206,4 +212,22 @@ void conntrack_record(struct conntrack *ct, const uint8_t *frame, size_t len, ui
   victim->lo = lo;
   victim->hi = hi;
   victim->last_seen = now;
+  ct->inserts++;
+}
+
+void conntrack_get_stats(const struct conntrack *ct, uint64_t now, struct conntrack_stats *out) {
+  if (out == NULL)
+    return;
+  memset(out, 0, sizeof(*out));
+  if (ct == NULL)
+    return;
+  out->capacity = ct->cap;
+  out->lookups = ct->lookups;
+  out->hits = ct->hits;
+  out->inserts = ct->inserts;
+  for (size_t i = 0; i < ct->cap; i++) {
+    const struct flow *f = &ct->flows[i];
+    if (f->used && !expired(ct, f, now))
+      out->live++;
+  }
 }

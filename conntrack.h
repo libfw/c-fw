@@ -22,4 +22,17 @@ bool conntrack_established(struct conntrack *ct, const uint8_t *frame, size_t le
 // Record (insert or refresh) the frame's flow as of `now`.
 void conntrack_record(struct conntrack *ct, const uint8_t *frame, size_t len, uint64_t now);
 
+// Observability snapshot. `live` is the number of used, non-expired flows at
+// `now`; the rest are cumulative since creation.
+struct conntrack_stats {
+  uint64_t capacity;
+  uint64_t live;
+  uint64_t lookups;
+  uint64_t hits;
+  uint64_t inserts;
+};
+
+// Fill *out with a counter snapshot (zeroed if ct is NULL).
+void conntrack_get_stats(const struct conntrack *ct, uint64_t now, struct conntrack_stats *out);
+
 #endif /* SOCKET_VMNET_CONNTRACK_H */
