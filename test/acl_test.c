@@ -318,6 +318,23 @@ int main(void) {
     check("stats(NULL) zeroed", z.allow[0] == 0 && z.nonip[1] == 0, true);
   }
 
+  /* acl_classify: 5-tuple extraction for UI event descriptions */
+  {
+    struct acl_l3l4 t;
+    n = build_ip(f, MAC_A, MAC_B, 6, IP(192, 168, 1, 5), IP(8, 8, 8, 8), 1234, 443, true, 5);
+    check("classify tcp ok", acl_classify(f, n, &t), true);
+    check("classify family 4", t.family == 4, true);
+    check("classify proto tcp", t.proto == 6, true);
+    check("classify sport", t.sport == 1234, true);
+    check("classify dport", t.dport == 443, true);
+    check("classify src octet", t.src[0] == 192 && t.src[3] == 5, true);
+    uint8_t arp[60];
+    memset(arp, 0, sizeof arp);
+    arp[12] = 0x08;
+    arp[13] = 0x06;
+    check("classify non-IP false", acl_classify(arp, sizeof arp, &t), false);
+  }
+
   /* String-escape error edges. */
   check("backslash at end", load_json("{\"c\":\"x\\") == NULL, true);
   check("truncated \\u", load_json("{\"c\":\"\\u1") == NULL, true);

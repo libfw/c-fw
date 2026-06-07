@@ -465,6 +465,19 @@ bool acl_allows(const struct acl *acl, enum acl_dir dir, const uint8_t *frame, s
   return acl_check(acl, dir, frame, len, NULL);
 }
 
+bool acl_classify(const uint8_t *frame, size_t len, struct acl_l3l4 *out) {
+  struct l3l4 p;
+  if (!classify(frame, len, &p))
+    return false;
+  out->family = p.family;
+  out->proto = p.proto;
+  out->sport = p.sport;
+  out->dport = p.dport;
+  memcpy(out->src, p.src, sizeof(out->src));
+  memcpy(out->dst, p.dst, sizeof(out->dst));
+  return true;
+}
+
 size_t acl_rule_count(const struct acl *acl) { return acl != NULL ? acl->n : 0; }
 
 uint64_t acl_rule_hits(const struct acl *acl, size_t idx) {

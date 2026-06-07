@@ -52,6 +52,19 @@ struct acl_stats {
   uint64_t nonip[2];
 };
 
+// Parsed L3/L4 view of a frame, for describing events in a UI. `sport`/`dport`
+// are -1 when not applicable (non-TCP/UDP or truncated).
+struct acl_l3l4 {
+  int family; // 4 or 6
+  uint8_t src[16], dst[16];
+  int proto;
+  int sport, dport;
+};
+
+// Classify a frame's L3/L4 tuple. Returns false for non-IP / runt / truncated
+// frames (the same ones acl_allows passes through unconditionally).
+bool acl_classify(const uint8_t *frame, size_t len, struct acl_l3l4 *out);
+
 // Number of rules in the list.
 size_t acl_rule_count(const struct acl *acl);
 
