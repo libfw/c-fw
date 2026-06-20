@@ -1,3 +1,5 @@
+<p align="center"><img src="https://raw.githubusercontent.com/libfw/brand/main/social/libfw.png" alt="libfw/c-fw" width="720"></p>
+
 # c-fw
 
 A small, embeddable **stateful L3/L4 packet filter** for C. It matches and
